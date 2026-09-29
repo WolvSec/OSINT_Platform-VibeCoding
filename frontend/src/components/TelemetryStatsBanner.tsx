@@ -2,7 +2,7 @@ import type { FC } from 'react';
 import { Box, Tooltip } from '@mui/material';
 import { keyframes } from '@mui/material/styles';
 import { useAppSelector } from '../store';
-import { hud } from '../theme';
+import { hud, displayTitle, eyebrow, hudEnter } from '../theme';
 import { HudPanel, StatReadout, PanelDivider } from './HudPrimitives';
 
 export interface TelemetryStatsBannerProps {
@@ -12,32 +12,30 @@ export interface TelemetryStatsBannerProps {
 }
 
 const pulse = keyframes`
-  0%   { box-shadow: 0 0 0 0 rgba(62, 230, 168, 0.55); }
-  70%  { box-shadow: 0 0 0 6px rgba(62, 230, 168, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(62, 230, 168, 0); }
+  0%   { box-shadow: 0 0 0 0 rgba(54, 215, 255, 0.6); }
+  70%  { box-shadow: 0 0 0 7px rgba(54, 215, 255, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(54, 215, 255, 0); }
 `;
 
 const numberFormat = new Intl.NumberFormat('en-US');
 
-/** "WS" (WolvSec) logo mark: a small accent tile with a reticle behind the monogram. */
+/** "WS" (WolvSec) logo mark: a solid maize block with the monogram in Michigan navy. */
 const BrandMark: FC = () => (
   <Box
     aria-hidden
     sx={{
-      width: 28,
-      height: 28,
-      borderRadius: '8px',
+      ...displayTitle,
+      width: 34,
+      height: 34,
+      borderRadius: '3px',
       flexShrink: 0,
       display: 'grid',
       placeItems: 'center',
-      position: 'relative',
-      background: `linear-gradient(145deg, ${hud.accent} 0%, #1fae86 100%)`,
-      boxShadow: '0 0 0 1px rgba(255,255,255,0.12) inset, 0 4px 14px rgba(62,230,168,0.25)',
-      color: '#03140d',
-      fontFamily: hud.fontMono,
-      fontWeight: 700,
-      fontSize: '0.72rem',
-      letterSpacing: '-0.02em'
+      bgcolor: hud.accent,
+      color: hud.onAccent,
+      fontSize: '0.95rem',
+      letterSpacing: '-0.02em',
+      boxShadow: `0 0 0 1px rgba(255, 203, 5, 0.35), 0 6px 18px rgba(255, 203, 5, 0.18)`
     }}
   >
     WS
@@ -60,7 +58,7 @@ export const TelemetryStatsBanner: FC<TelemetryStatsBannerProps> = ({
   let statusHint = 'Telemetry stream disconnected';
   if (isConnected) {
     statusLabel = 'Live';
-    statusColor = hud.accent;
+    statusColor = hud.signal;
     statusHint = 'Connected to the live telemetry stream';
   } else if (isReconnecting) {
     statusLabel = 'Reconnecting';
@@ -75,26 +73,25 @@ export const TelemetryStatsBanner: FC<TelemetryStatsBannerProps> = ({
         display: 'flex',
         alignItems: 'center',
         gap: { xs: 1.25, sm: 2 },
-        height: 52,
+        height: 56,
         pl: 1.25,
-        pr: { xs: 1.5, sm: 2 },
+        pr: { xs: 1.5, sm: 2.25 },
         minWidth: 0,
-        pointerEvents: 'auto'
+        pointerEvents: 'auto',
+        ...hudEnter(0, 'top')
       }}
     >
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.1, flexShrink: 0 }}>
         <BrandMark />
-        <Box
-          sx={{
-            fontWeight: 600,
-            fontSize: '0.9rem',
-            letterSpacing: '0.14em',
-            color: hud.textPrimary,
-            lineHeight: 1,
-            display: { xs: 'none', sm: 'block' }
-          }}
-        >
-          OSINT
+        <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
+          <Box
+            sx={{ ...displayTitle, fontSize: '1.25rem', color: hud.textPrimary, lineHeight: 0.95 }}
+          >
+            OSINT
+          </Box>
+          <Box sx={{ ...eyebrow, fontSize: '0.5625rem', color: hud.accent, mt: 0.4 }}>
+            WolvSec · Mission control
+          </Box>
         </Box>
       </Box>
 
@@ -110,22 +107,26 @@ export const TelemetryStatsBanner: FC<TelemetryStatsBannerProps> = ({
             gap: 0.9,
             height: 26,
             px: 1.1,
-            borderRadius: 999,
+            borderRadius: '2px',
             flexShrink: 0,
-            bgcolor: `${statusColor}1a`,
-            border: `1px solid ${statusColor}40`,
+            bgcolor: `${statusColor}14`,
+            border: `1px solid ${statusColor}55`,
             color: statusColor,
-            fontSize: '0.75rem',
-            fontWeight: 600
+            fontFamily: hud.fontMono,
+            fontSize: '0.6875rem',
+            fontWeight: 700,
+            letterSpacing: '0.12em',
+            textTransform: 'uppercase'
           }}
         >
           <Box
             sx={{
               width: 7,
               height: 7,
-              borderRadius: '50%',
+              borderRadius: '1px',
               bgcolor: statusColor,
-              animation: isConnected ? `${pulse} 1.8s ease-out infinite` : 'none'
+              animation: isConnected ? `${pulse} 1.8s ease-out infinite` : 'none',
+              '@media (prefers-reduced-motion: reduce)': { animation: 'none' }
             }}
           />
           <span>{statusLabel}</span>

@@ -108,9 +108,6 @@ function upsertZone(
   }
 }
 
-/** Camera height above the target for fly-to: regional context, marker still legible. */
-const FLY_TO_HEIGHT_M = 1_500_000;
-
 export const GlobeView: FC = () => {
   const dispatch = useAppDispatch();
   const entities = useAppSelector((s) => s.entities.entities);
@@ -139,7 +136,6 @@ export const GlobeView: FC = () => {
   // Drop entities that outlived their source's display.ttl (the server prunes too).
   useTtlPruner();
   const spinningRef = useRef(true);
-  const flyTo = useAppSelector((s) => s.entities.flyTo);
 
   // Mount once: create the viewer, the billboard layer, and the click handler.
   useEffect(() => {
@@ -277,29 +273,6 @@ export const GlobeView: FC = () => {
     if (!viewer || !controller || viewer.isDestroyed()) return;
     void controller.apply(globeStyle);
   }, [globeStyle]);
-
-  // Fly-to requests (e.g. picking a search result). Keyed on the request only: a later entity
-  // update must not yank the camera back.
-  useEffect(() => {
-    const viewer = viewerRef.current;
-    if (!flyTo || !viewer || viewer.isDestroyed()) return;
-    const entity = entities[flyTo.entityId];
-    const target =
-      entity ??
-      (flyTo.latitude !== undefined && flyTo.longitude !== undefined
-        ? { latitude: flyTo.latitude, longitude: flyTo.longitude, altitude: 0 }
-        : null);
-    if (!target) return;
-    spinningRef.current = false;
-    viewer.camera.flyTo({
-      destination: Cesium.Cartesian3.fromDegrees(
-        target.longitude,
-        target.latitude,
-        Math.max(renderHeight(target.altitude), 0) + FLY_TO_HEIGHT_M
-      ),
-      duration: 1.8
-    });
-  }, [flyTo]);
 
   // Trail length per source follows `display.trail.max_points`.
   useEffect(() => {

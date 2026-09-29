@@ -7,10 +7,35 @@ import { GlobeView } from './components/GlobeView';
 import { TelemetryStatsBanner } from './components/TelemetryStatsBanner';
 import { LayerControlDrawer } from './components/LayerControlDrawer';
 import { EntityDetailsDrawer } from './components/EntityDetailsDrawer';
-import { SearchBox } from './components/SearchBox';
 
-/** Top offset of the side panels on tablet/desktop: gutter + top bar (52) + 12px gap. */
-const SIDE_TOP = 80;
+/** Top offset of the side panels on tablet/desktop: gutter + top bar (56) + 12px gap. */
+const SIDE_TOP = 84;
+
+/**
+ * Space backdrop, drawn over the globe canvas and under the HUD: a Michigan-navy vignette and a
+ * faint blueprint grid, both masked out of the centre so the globe itself is never tinted.
+ */
+const backdropSx = {
+  position: 'absolute',
+  inset: 0,
+  pointerEvents: 'none',
+  zIndex: 1,
+  background: [
+    'radial-gradient(ellipse 75% 85% at 50% 50%, transparent 55%, rgba(0, 39, 76, 0.38) 100%)',
+    'linear-gradient(180deg, rgba(5, 13, 26, 0.55) 0%, transparent 18%, transparent 82%, rgba(5, 13, 26, 0.6) 100%)'
+  ].join(', '),
+  '&::after': {
+    content: '""',
+    position: 'absolute',
+    inset: 0,
+    backgroundImage:
+      'linear-gradient(rgba(163, 181, 204, 0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(163, 181, 204, 0.06) 1px, transparent 1px)',
+    backgroundSize: '64px 64px',
+    backgroundPosition: 'center',
+    WebkitMaskImage: 'radial-gradient(ellipse 70% 80% at 50% 50%, transparent 45%, #000 100%)',
+    maskImage: 'radial-gradient(ellipse 70% 80% at 50% 50%, transparent 45%, #000 100%)'
+  }
+} as const;
 
 /**
  * Full-bleed layout: the globe fills the viewport and every HUD element floats above it on a
@@ -19,12 +44,12 @@ const SIDE_TOP = 80;
  *
  * Z-INDEX CONTRACT — top of the stack last:
  *   globe canvas            0   GlobeView
+ *   backdrop                1   vignette + grid (pointer-events: none)
  *   HUD layer               20  top bar, layers, inspector
  *   menus / tooltips        1300+ (MUI default)
  *
- * Right column (sm+): a selected entity's card. Phones (< sm): the search box gets its own row,
- * and layers and the inspector are bottom sheets; the layers panel folds away whenever an
- * entity is opened.
+ * Right column (sm+): a selected entity's card. Phones (< sm): layers and the inspector are
+ * bottom sheets; the layers panel folds away whenever an entity is opened.
  */
 export const App: FC = () => {
   const { isConnected, isReconnecting, messageRate } = useWebSocket();
@@ -52,6 +77,7 @@ export const App: FC = () => {
       <Box sx={{ position: 'absolute', inset: 0 }}>
         <GlobeView />
       </Box>
+      <Box aria-hidden data-testid="hud-backdrop" sx={backdropSx} />
 
       <Box
         data-testid="hud-layer"
@@ -63,31 +89,13 @@ export const App: FC = () => {
           p: gutter
         }}
       >
-        {/* Top bar: brand + telemetry on the left, search beside it. */}
-        <Box
-          sx={{
-            display: 'flex',
-            alignItems: 'flex-start',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: 1
-          }}
-        >
+        {/* Top bar: brand + telemetry. */}
+        <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
           <TelemetryStatsBanner
             isConnected={isConnected}
             isReconnecting={isReconnecting}
             messageRate={messageRate}
           />
-          <Box
-            sx={{
-              flex: { xs: '1 1 140px', md: '1 1 280px' },
-              maxWidth: { md: 440 },
-              mx: { md: 'auto' },
-              minWidth: 0
-            }}
-          >
-            <SearchBox />
-          </Box>
         </Box>
 
         {/* Layers / legend */}

@@ -7,7 +7,7 @@ import { useAppDispatch, useAppSelector } from '../store';
 import { setSelectedEntityId, parseEntityMetadata } from '../store/slices/entitiesSlice';
 import { useGetObservationsQuery } from '../store/api/osintApi';
 import { ATC_ZONE_CATEGORY } from './globeMarkers';
-import { hud, eyebrow, monoValue } from '../theme';
+import { hud, eyebrow, monoValue, hudEnter } from '../theme';
 import { HudPanel, CategoryGlyph, CATEGORY_META, categorySingular } from './HudPrimitives';
 import { resolveEntityStyle } from './layerStyle';
 import { formatField, metadataKeysInFields, relativeTime } from './entityFields';
@@ -39,7 +39,8 @@ const Section: FC<{ title: string; aside?: ReactNode; children: ReactNode }> = (
   children
 }) => (
   <Box component="section" sx={{ px: 2, py: 1.75, borderTop: `1px solid ${hud.hairline}` }}>
-    <Box sx={{ ...eyebrow, display: 'flex', alignItems: 'center', mb: 1.25 }}>
+    <Box sx={{ ...eyebrow, display: 'flex', alignItems: 'center', gap: 1, mb: 1.25 }}>
+      <Box aria-hidden sx={{ width: 10, height: 2, bgcolor: hud.accent, flexShrink: 0 }} />
       <Box component="h3" sx={{ m: 0, font: 'inherit' }}>
         {title}
       </Box>
@@ -56,11 +57,21 @@ const Fact: FC<{ label: string; children: ReactNode; wide?: boolean }> = ({
   wide
 }) => (
   <Box sx={{ gridColumn: wide ? '1 / -1' : undefined, minWidth: 0 }}>
-    <Box sx={{ fontSize: '0.6875rem', color: hud.textSecondary, mb: 0.25 }}>{label}</Box>
+    <Box
+      sx={{
+        fontSize: '0.6875rem',
+        fontWeight: hud.weightLight,
+        color: hud.textSecondary,
+        mb: 0.25
+      }}
+    >
+      {label}
+    </Box>
     <Box
       sx={{
         ...monoValue,
-        fontSize: '0.8125rem',
+        fontSize: '0.875rem',
+        fontWeight: 500,
         color: hud.textPrimary,
         overflowWrap: 'anywhere'
       }}
@@ -85,7 +96,10 @@ const KeyValueTable: FC<{ rows: [string, ReactNode][] }> = ({ rows }) => (
   >
     {rows.map(([k, v]) => (
       <Box key={k} sx={{ display: 'contents' }}>
-        <Box component="dt" sx={{ color: hud.textSecondary, overflowWrap: 'anywhere' }}>
+        <Box
+          component="dt"
+          sx={{ color: hud.textSecondary, fontWeight: hud.weightLight, overflowWrap: 'anywhere' }}
+        >
           {k}
         </Box>
         <Box
@@ -196,6 +210,7 @@ export const EntityDetailsDrawer: FC = () => {
   return (
     <HudPanel
       component="aside"
+      key={entity.id}
       aria-label="Entity details"
       sx={{
         pointerEvents: 'auto',
@@ -203,7 +218,8 @@ export const EntityDetailsDrawer: FC = () => {
         maxHeight: '100%',
         display: 'flex',
         flexDirection: 'column',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        ...hudEnter(-1, 'right')
       }}
     >
       {/* Header */}
@@ -217,9 +233,12 @@ export const EntityDetailsDrawer: FC = () => {
               alignItems: 'center',
               height: 20,
               px: 0.9,
-              borderRadius: '5px',
-              fontSize: '0.6875rem',
-              fontWeight: 600,
+              borderRadius: '2px',
+              fontFamily: hud.fontMono,
+              fontSize: '0.625rem',
+              fontWeight: 700,
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase',
               color,
               bgcolor: `${color}1a`,
               border: `1px solid ${color}40`
@@ -231,11 +250,11 @@ export const EntityDetailsDrawer: FC = () => {
             component="h2"
             sx={{
               m: 0,
-              mt: 0.75,
-              fontSize: '1rem',
-              fontWeight: 600,
-              lineHeight: 1.3,
-              letterSpacing: '-0.01em',
+              mt: 0.9,
+              fontSize: '1.25rem',
+              fontWeight: 900,
+              lineHeight: 1.12,
+              letterSpacing: '-0.02em',
               overflowWrap: 'anywhere'
             }}
           >
@@ -246,7 +265,7 @@ export const EntityDetailsDrawer: FC = () => {
               ...monoValue,
               fontSize: '0.6875rem',
               color: hud.textMuted,
-              mt: 0.25,
+              mt: 0.6,
               overflowWrap: 'anywhere'
             }}
           >
@@ -298,7 +317,7 @@ export const EntityDetailsDrawer: FC = () => {
                 sx={{
                   mt: 1.5,
                   height: 34,
-                  borderRadius: '8px',
+                  borderRadius: '2px',
                   color,
                   bgcolor: `${color}14`,
                   border: `1px solid ${color}40`,
@@ -336,7 +355,7 @@ export const EntityDetailsDrawer: FC = () => {
 
         <Section title="Last update">
           <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
-            <Box sx={{ fontSize: '0.875rem', fontWeight: 500 }}>
+            <Box sx={{ fontSize: '1rem', fontWeight: 900, letterSpacing: '-0.01em' }}>
               {relativeTime(entity.timestamp, now)}
             </Box>
             <Box

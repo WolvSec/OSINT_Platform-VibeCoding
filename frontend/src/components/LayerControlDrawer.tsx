@@ -9,14 +9,14 @@ import {
   Switch,
   Tooltip
 } from '@mui/material';
-import SearchIcon from '@mui/icons-material/Search';
+import FilterListIcon from '@mui/icons-material/FilterList';
 import LayersOutlinedIcon from '@mui/icons-material/LayersOutlined';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { useAppDispatch, useAppSelector } from '../store';
 import { toggleSourceEnabled } from '../store/slices/sourcesSlice';
 import { setActiveCategoryFilter } from '../store/slices/entitiesSlice';
-import { hud, eyebrow, monoValue } from '../theme';
+import { hud, eyebrow, monoValue, displayTitle, hudEnter } from '../theme';
 import { HudPanel, CategoryGlyph } from './HudPrimitives';
 import { buildLegend, countByLayer, filterLegend, type LegendLayer } from './legend';
 
@@ -70,25 +70,25 @@ export const LayerControlDrawer: FC<LayerControlDrawerProps> = ({ open, onClose,
 
   if (!open) {
     return (
-      <HudPanel sx={{ pointerEvents: 'auto', display: 'inline-flex' }}>
+      <HudPanel sx={{ pointerEvents: 'auto', display: 'inline-flex', ...hudEnter(0, 'left') }}>
         <ButtonBase
           onClick={onOpen}
           aria-label="open layer controls"
           sx={{
             height: 44,
             px: 1.5,
-            gap: 1,
+            gap: 1.25,
             borderRadius: `${hud.radius}px`,
             color: hud.textPrimary,
-            fontSize: '0.8125rem',
-            fontWeight: 500
+            ...displayTitle,
+            fontSize: '0.8125rem'
           }}
         >
           <LayersOutlinedIcon sx={{ fontSize: 18, color: hud.accent }} />
           Layers
           <Box
             component="span"
-            sx={{ ...monoValue, color: hud.textSecondary, fontSize: '0.75rem' }}
+            sx={{ ...monoValue, color: hud.accent, fontSize: '0.75rem', fontWeight: 700 }}
           >
             {numberFormat.format(total)}
           </Box>
@@ -107,7 +107,8 @@ export const LayerControlDrawer: FC<LayerControlDrawerProps> = ({ open, onClose,
         maxHeight: '100%',
         display: 'flex',
         flexDirection: 'column',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        ...hudEnter(1, 'left')
       }}
     >
       <Box
@@ -117,24 +118,29 @@ export const LayerControlDrawer: FC<LayerControlDrawerProps> = ({ open, onClose,
           gap: 1,
           pl: 2,
           pr: 1,
-          height: 48,
+          height: 50,
           flexShrink: 0,
           borderBottom: `1px solid ${hud.hairline}`
         }}
       >
         <LayersOutlinedIcon sx={{ fontSize: 18, color: hud.accent }} />
-        <Box component="h2" sx={{ m: 0, fontSize: '0.875rem', fontWeight: 600, flexGrow: 1 }}>
+        <Box component="h2" sx={{ ...displayTitle, m: 0, fontSize: '0.9375rem', flexGrow: 1 }}>
           Layers
         </Box>
         {activeCategory !== null && (
           <ButtonBase
             onClick={() => dispatch(setActiveCategoryFilter(null))}
             sx={{
-              fontSize: '0.75rem',
+              fontFamily: hud.fontMono,
+              fontSize: '0.6875rem',
+              fontWeight: 700,
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
               color: hud.accent,
               px: 1,
               height: 26,
-              borderRadius: '6px',
+              borderRadius: '2px',
+              border: `1px solid ${hud.accent}55`,
               '&:hover': { bgcolor: hud.accentSoft }
             }}
           >
@@ -156,7 +162,10 @@ export const LayerControlDrawer: FC<LayerControlDrawerProps> = ({ open, onClose,
       <Box sx={{ flexGrow: 1, minHeight: 0, overflowY: 'auto', p: 1 }}>
         <Box sx={{ ...eyebrow, px: 1, pt: 0.5, pb: 1, display: 'flex' }}>
           <span>Map legend</span>
-          <Box component="span" sx={{ ml: 'auto', ...monoValue, letterSpacing: 0 }}>
+          <Box
+            component="span"
+            sx={{ ml: 'auto', ...monoValue, letterSpacing: 0, color: hud.accent, fontWeight: 700 }}
+          >
             {numberFormat.format(total)}
           </Box>
         </Box>
@@ -171,12 +180,12 @@ export const LayerControlDrawer: FC<LayerControlDrawerProps> = ({ open, onClose,
               mb: 1,
               px: 1,
               height: 30,
-              borderRadius: '8px',
-              bgcolor: hud.surfaceHover,
+              borderRadius: '2px',
+              bgcolor: 'rgba(5, 13, 26, 0.6)',
               border: `1px solid ${hud.hairline}`
             }}
           >
-            <SearchIcon sx={{ fontSize: 16, color: hud.textMuted }} />
+            <FilterListIcon sx={{ fontSize: 16, color: hud.textMuted }} />
             <InputBase
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -200,7 +209,7 @@ export const LayerControlDrawer: FC<LayerControlDrawerProps> = ({ open, onClose,
                   width: '100%',
                   px: 1,
                   py: 0.5,
-                  borderRadius: '6px',
+                  borderRadius: '2px',
                   gap: 0.5,
                   '&:hover': { bgcolor: hud.surfaceHover }
                 }}
@@ -251,7 +260,7 @@ export const LayerControlDrawer: FC<LayerControlDrawerProps> = ({ open, onClose,
         <ButtonBase
           onClick={() => setSourcesOpen((v) => !v)}
           aria-expanded={sourcesOpen}
-          sx={{ ...eyebrow, width: '100%', px: 1, py: 0.75, borderRadius: '6px', gap: 0.5 }}
+          sx={{ ...eyebrow, width: '100%', px: 1, py: 0.75, borderRadius: '2px', gap: 0.5 }}
         >
           <span>Data sources</span>
           <Box
@@ -287,6 +296,7 @@ export const LayerControlDrawer: FC<LayerControlDrawerProps> = ({ open, onClose,
                   typography: {
                     sx: {
                       fontSize: '0.8125rem',
+                      fontWeight: hud.weightLight,
                       color: hud.textPrimary,
                       flexGrow: 1,
                       overflow: 'hidden',
@@ -331,11 +341,11 @@ const LegendRow: FC<{
           gap: 1.25,
           px: 1,
           py: 0.75,
-          borderRadius: '8px',
+          borderRadius: '2px',
           textAlign: 'left',
           opacity: isHidden ? 0.42 : 1,
           bgcolor: isActive ? `${color}14` : 'transparent',
-          boxShadow: isActive ? `inset 0 0 0 1px ${color}40` : 'none',
+          boxShadow: isActive ? `inset 2px 0 0 ${color}, inset 0 0 0 1px ${color}40` : 'none',
           transition: 'background-color 120ms, opacity 120ms',
           '&:hover': { bgcolor: isActive ? `${color}1f` : hud.surfaceHover, opacity: 1 }
         }}
@@ -345,7 +355,7 @@ const LegendRow: FC<{
           <Box
             sx={{
               fontSize: '0.8125rem',
-              fontWeight: 500,
+              fontWeight: 700,
               color: hud.textPrimary,
               lineHeight: 1.3,
               overflow: 'hidden',
@@ -359,8 +369,9 @@ const LegendRow: FC<{
             <Box
               sx={{
                 fontSize: '0.6875rem',
+                fontWeight: hud.weightLight,
                 color: hud.textSecondary,
-                lineHeight: 1.3,
+                lineHeight: 1.35,
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap'
@@ -374,7 +385,8 @@ const LegendRow: FC<{
           component="span"
           sx={{
             ...monoValue,
-            fontSize: '0.75rem',
+            fontSize: '0.8125rem',
+            fontWeight: 700,
             color: count > 0 ? hud.textPrimary : hud.textMuted
           }}
         >

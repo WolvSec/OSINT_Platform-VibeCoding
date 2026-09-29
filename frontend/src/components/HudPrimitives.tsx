@@ -57,7 +57,7 @@ export const CategoryGlyph = ({
         width: size + 10,
         height: size + 10,
         flexShrink: 0,
-        borderRadius: '8px',
+        borderRadius: '3px',
         display: 'grid',
         placeItems: 'center',
         bgcolor: `${color}14`,
@@ -86,20 +86,23 @@ export const StatReadout = ({
   ariaLabel: string;
 }) => (
   <Box role="group" aria-label={ariaLabel} sx={{ minWidth: 0 }}>
-    <Box sx={eyebrow}>{label}</Box>
+    <Box sx={{ ...eyebrow, fontSize: '0.5625rem', color: hud.textMuted }}>{label}</Box>
     <Box
       sx={{
         ...monoValue,
-        fontSize: '0.875rem',
-        fontWeight: 500,
+        fontSize: '1rem',
+        fontWeight: 700,
         color: hud.textPrimary,
-        lineHeight: 1.35,
+        lineHeight: 1.3,
         whiteSpace: 'nowrap'
       }}
     >
       {value}
       {unit && (
-        <Box component="span" sx={{ color: hud.textMuted, ml: 0.5, fontSize: '0.75rem' }}>
+        <Box
+          component="span"
+          sx={{ color: hud.textMuted, ml: 0.5, fontSize: '0.6875rem', fontWeight: 400 }}
+        >
           {unit}
         </Box>
       )}
@@ -109,5 +112,8 @@ export const StatReadout = ({
 
 /** Thin vertical hairline between groups inside a panel. */
 export const PanelDivider = () => (
-  <Box aria-hidden sx={{ width: '1px', alignSelf: 'stretch', my: 1, bgcolor: hud.hairline }} />
+  <Box
+    aria-hidden
+    sx={{ width: '1px', alignSelf: 'stretch', my: 1.25, bgcolor: hud.hairlineStrong }}
+  />
 );

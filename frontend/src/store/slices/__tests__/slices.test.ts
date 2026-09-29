@@ -4,7 +4,6 @@ import entitiesReducer, {
   upsertEntity,
   setSelectedEntityId,
   setActiveCategoryFilter,
-  requestFlyTo,
   MAX_TRAIL_POINTS,
   parseEntityMetadata,
   type EntityRecord
@@ -75,13 +74,6 @@ describe('Redux Slices', () => {
 
       state = entitiesReducer(state, setSelectedEntityId(null));
       expect(state.selectedEntityId).toBeNull();
-    });
-
-    it('bumps the fly-to nonce on every request, even for the same target', () => {
-      let state = entitiesReducer(undefined, requestFlyTo('e1'));
-      expect(state.flyTo).toEqual({ entityId: 'e1', nonce: 1 });
-      state = entitiesReducer(state, requestFlyTo({ entityId: 'e1', latitude: 10, longitude: 20 }));
-      expect(state.flyTo).toEqual({ entityId: 'e1', latitude: 10, longitude: 20, nonce: 2 });
     });
   });
 

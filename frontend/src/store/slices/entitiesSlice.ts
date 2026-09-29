@@ -44,18 +44,6 @@ export function parseEntityMetadata(metadata: unknown): Record<string, unknown> 
     : {};
 }
 
-/**
- * A one-shot camera request. `nonce` changes on every request so asking to fly to the same
- * entity twice (after the user panned away) still triggers the GlobeView effect.
- */
-export interface FlyToRequest {
-  entityId: string;
-  nonce: number;
-  /** Fallback target when the entity is not (yet) in the store. */
-  latitude?: number;
-  longitude?: number;
-}
-
 export interface EntitiesState {
   entities: Record<string, EntityRecord>;
   selectedEntityId: string | null;
@@ -65,7 +53,6 @@ export interface EntitiesState {
    * Sources not listed keep MAX_TRAIL_POINTS.
    */
   trailLimits: Record<string, number>;
-  flyTo: FlyToRequest | null;
 }
 
 /** Trail points retained per entity (bounded so long-running sessions don't grow forever). */
@@ -75,8 +62,7 @@ const initialState: EntitiesState = {
   entities: {},
   selectedEntityId: null,
   activeCategoryFilter: null,
-  trailLimits: {},
-  flyTo: null
+  trailLimits: {}
 };
 
 function pointOf(ent: EntityRecord): TrailPoint {
@@ -126,14 +112,6 @@ const entitiesSlice = createSlice({
     },
     setTrailLimits(state, action: PayloadAction<Record<string, number>>) {
       state.trailLimits = action.payload;
-    },
-    requestFlyTo(
-      state,
-      action: PayloadAction<string | { entityId: string; latitude?: number; longitude?: number }>
-    ) {
-      const req =
-        typeof action.payload === 'string' ? { entityId: action.payload } : action.payload;
-      state.flyTo = { ...req, nonce: (state.flyTo?.nonce ?? 0) + 1 };
     }
   }
 });
@@ -144,7 +122,6 @@ export const {
   removeEntities,
   setSelectedEntityId,
   setActiveCategoryFilter,
-  setTrailLimits,
-  requestFlyTo
+  setTrailLimits
 } = entitiesSlice.actions;
 export default entitiesSlice.reducer;
