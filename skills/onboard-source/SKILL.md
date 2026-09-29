@@ -28,6 +28,8 @@ Source of truth when this page and the code disagree: `backend/src/engine/yaml-l
 curl -s "<URL>" | head -c 3000
 ```
 
+(On Windows PowerShell use `curl.exe`, not `curl`, and drop `| head -c 3000`; or open the URL in a browser.)
+
 Work out:
 
 - The shape: a top-level JSON array, a JSON object holding the array (note the path, e.g. `query.geosearch`), a single JSON object, a GeoJSON `FeatureCollection`, CSV, XML, or RSS/Atom.
@@ -161,49 +163,35 @@ Do not add keys the engine does not know (`kind`, `labels`, `cache`, `history`, 
 
 ## Step 7: Verify
 
-1. **The file loads** (no server needed). From the repository root:
+Every command below is plain `npm`, so it works the same in bash, zsh, PowerShell and cmd. On Windows, `make` is usually not installed: use the `npm run` form.
+
+1. **The file loads and maps to points** (no server needed). From the repository root:
 
    ```bash
-   cd backend && npx tsx -e "
-   const { loadSourcesFromDir } = require('./src/engine/yaml-loader');
-   for (const s of loadSourcesFromDir('../sources.d'))
-     console.log(s.name, s.layer.id, s.layer.group, s.display.icon, s.display.color);"
+   npm run check-source -- <name>
    ```
 
-   Your source must be listed with the group, icon and colour you chose. If it is missing, the line above it reads `Skipping invalid source definition <path>: <problems>`; fix every problem listed. A line `unknown display.icon "x", using "dot"` means the icon key is wrong.
+   It loads `sources.d/`, fetches the URL once, runs every record through the mapper and checks `display.ttl` against the records' own timestamps. Expected output ends in `PASS`:
 
-2. **The mapping produces points.** Fetch the URL and run a few records through the mapper; every one should give real coordinates:
-
-   ```bash
-   cd backend && npx tsx -e "
-   const { loadSourcesFromDir } = require('./src/engine/yaml-loader');
-   const { parsePayload } = require('./src/engine/parsers');
-   const fm = require('./src/engine/field-mapper');
-   (async () => {
-     const c = loadSourcesFromDir('../sources.d').find(s => s.name === '<name>');
-     const body = await (await fetch(c.transport.url, { headers: c.transport.headers })).text();
-     const recs = parsePayload(body, c.parser.format, c.parser.records_path, c.parser.max_records, c.parser);
-     const ctx = fm.expressionContext(c);
-     const kept = recs.filter(r => fm.passesFilter(r, c.filter, ctx));
-     const out = kept.map(r => fm.mapRecord(r, c, c.name)).filter(Boolean);
-     console.log(recs.length, 'records,', kept.length, 'after filter,', out.length, 'mapped');
-     console.log(out.slice(0, 2).map(o => o.entity));
-   })();"
+   ```
+   ok   loads: layer <layer.id> (<group>), icon <icon>, <color>
+   ok   32 records, 32 after filter, 32 mapped
+   ...
+   PASS
    ```
 
-   `0 mapped` means `records_path`, the id or the coordinate paths are wrong (check `[lon, lat]` order).
+   What a failure means:
 
-3. **Restart the backend.** There is no hot reload for sources: `SOURCES_DIR` is read once at startup. Stop `make dev` (Ctrl+C) and run `make dev` again. Watch the backend log for `Error polling source <name>` (network/HTTP/parse failure) or `skipped N record(s) with missing id/coordinates`.
+   - `FAIL <name> did not load`: read the line above it, `Skipping invalid source definition <path>: <problems>`, and fix every problem listed. `unknown display.icon "x", using "dot"` means the icon key is wrong.
+   - `0 mapped`: `records_path`, the id or the coordinate paths are wrong (check `[lon, lat]` order).
+   - `all N records are older than ttl`: the retention sweep would empty the layer a minute after startup. Delete the `ttl` line or raise it. Neither the log nor `npm test` reports this.
 
-4. **The API has data** (backend on port 4000, or your `PORT`):
+   `npm run check-source` with no name lists every source that loads, with its group, icon and colour.
 
-   ```bash
-   curl -s "http://localhost:4000/api/entities?source_id=<name>&limit=5"
-   curl -s http://localhost:4000/api/sources   # your source, with its resolved layer + display
-   ```
+2. **Restart the backend.** There is no hot reload for sources: `SOURCES_DIR` is read once at startup. Stop `npm run dev` (Ctrl+C) and run `npm run dev` again. Watch the backend log for `Error polling source <name>` (network/HTTP/parse failure) or `skipped N record(s) with missing id/coordinates`.
 
-   `total` should be above 0 after the first poll (the first poll runs right after startup). Wait about 70 seconds and run the first curl again: if `total` dropped to 0, the retention sweep deleted everything because `display.ttl` is shorter than the age of the records' timestamps. Remove or raise the `ttl`. Neither the log nor `make test` reports this.
+3. **The API has data.** Run `npm run check-source -- <name>` again while the backend is up: the last line before `PASS` reads `ok   backend has N <name> entities`. Or open `http://localhost:4000/api/entities?source_id=<name>&limit=5` in a browser (port 4000 unless you set `PORT`).
 
-5. **Look at the globe** at http://localhost:3000. The layer appears in the legend under its `group` with its icon, the markers use your colour, and clicking one shows the `display.fields` rows.
+4. **Look at the globe** at http://localhost:3000. The layer appears in the legend under its `group` with its icon, the markers use your colour, and clicking one shows the `display.fields` rows.
 
-6. **Tests and formatting.** `make test` checks that every source that loads from `sources.d/` has a declared `layer` and `display` and a category equal to `layer.id` (an invalid file is skipped rather than failed, so step 1 is the real load check). `npm run format:check` covers `sources.d/*.yaml`; run `make format` if it flags your file.
+5. **Tests and formatting.** `npm test` checks that every source that loads from `sources.d/` has a declared `layer` and `display` and a category equal to `layer.id` (an invalid file is skipped rather than failed, so step 1 is the real load check). `npm run format:check` covers `sources.d/*.yaml`; run `npm run format` if it flags your file.

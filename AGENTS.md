@@ -17,18 +17,22 @@ Follow `skills/onboard-source/SKILL.md` step by step. In short:
 - Write exactly one file, `sources.d/<name>.yaml`, modelled on `sources.d/eonet_wildfires.yaml`, with `layer:` (valid `group`) and `display:` (valid `icon`, hex `color`) blocks.
 - Do not set `entity.category`; it defaults to `layer.id`.
 - Never put API keys in YAML. Use `${ENV_VAR}` and `backend/.env`.
-- Sources are loaded once at startup. There is no hot reload: restart the backend (`make dev`) after adding or editing a source, then check `curl "http://localhost:4000/api/entities?source_id=<name>&limit=5"` (port 4000 unless you set `PORT`). Check it again after ~70 s: `display.ttl` is measured from each record's own timestamp, so a too-short ttl silently empties the layer.
+- Check the file with `npm run check-source -- <name>` (loads it, fetches the feed, maps the records, flags a `display.ttl` shorter than the records' age). It must end in `PASS`.
+- Sources are loaded once at startup. There is no hot reload: restart the backend (`npm run dev`) after adding or editing a source, then run `npm run check-source -- <name>` again to see the entity count.
 - Do not edit `backend/` or `frontend/` to add a source. Change the engine only when the YAML schema genuinely cannot express the feed, and add a test when you do.
 
 ## Commands
 
+Use the `npm` commands: they work in every shell. `make <target>` does the same on macOS and Linux, but Windows usually has no `make`.
+
 | Command | What it does |
 | :-- | :-- |
-| `make install` | `npm install` for root, backend and frontend |
-| `make dev` | backend on :4000 and frontend on :3000 (open http://localhost:3000) |
-| `make test` | backend Jest + frontend Vitest; also checks every loaded `sources.d/` source has a `layer` and `display` |
-| `make lint` | `tsc --noEmit` in both workspaces |
-| `make format` / `npm run format:check` | Prettier write / check (CI runs the check) |
-| `make build` | compile backend and frontend |
+| `npm install` | install root, backend and frontend |
+| `npm run dev` | backend on :4000 and frontend on :3000 (open http://localhost:3000) |
+| `npm run check-source -- <name>` | load, fetch and map one source; flags a too-short `ttl` |
+| `npm test` | backend Jest + frontend Vitest; also checks every loaded `sources.d/` source has a `layer` and `display` |
+| `npm run lint` | `tsc --noEmit` in both workspaces |
+| `npm run format` / `npm run format:check` | Prettier write / check (CI runs the check) |
+| `npm run build` | compile backend and frontend |
 
 Node 22.22.2 or newer. Environment variables keep the `MKOSINT_` prefix; see `docs/development.md`.

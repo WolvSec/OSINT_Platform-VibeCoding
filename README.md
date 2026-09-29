@@ -28,7 +28,8 @@ npm run dev
 **Windows** (PowerShell; close and reopen it after the two installs):
 
 ```powershell
-winget install OpenJS.NodeJS.LTS Git.Git
+winget install OpenJS.NodeJS.LTS
+winget install Git.Git
 git clone https://github.com/<you>/OSINT_Platform-VibeCoding.git
 cd OSINT_Platform-VibeCoding
 npm install
@@ -86,6 +87,8 @@ Paste this into your AI tool of choice, from the repo root:
 > Read `skills/onboard-source/SKILL.md` and follow it. Use `sources.d/eonet_wildfires.yaml` as the template. Add a new source for NASA EONET open volcano events from `https://eonet.gsfc.nasa.gov/api/v3/events/geojson?category=volcanoes&status=open`. Put it in the `Hazards` group with the `volcano` icon. Volcano events keep their eruption start date, which can be months old, so do not copy the template's `ttl`. Run the verification steps in the skill and show me the output.
 
 Then stop the dev server (`Ctrl+C`) and run `npm run dev` again (sources load only at startup) and look for the new layer in the legend.
+
+Check it any time with `npm run check-source -- eonet_volcanoes` (works in every terminal, ends in `PASS`).
 
 Stuck? Diff your file against `sources.d/eonet_wildfires.yaml`. Almost everything carries over, except `ttl`: if the layer shows up and then empties a minute later, delete that line.
 
