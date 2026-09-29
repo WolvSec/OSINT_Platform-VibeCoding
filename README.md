@@ -13,20 +13,49 @@ Slides: [wolvsec-osint-talk.pptx](https://github.com/WolvSec/OSINT_Platform-Vibe
 
 ## Quickstart
 
-You need **Node.js 22.22.2 or newer** (`node -v`), npm and git. `make` is optional; each target is a thin wrapper around an npm script.
+You need **Node.js 22 or newer** and **git**. Click **"Use this template"** (or fork) on GitHub first, then copy the block for your OS into a terminal.
+
+**macOS** (Terminal, with [Homebrew](https://brew.sh)):
 
 ```bash
-# Click "Use this template" (or fork) on GitHub first, then clone your copy:
+brew install node git
 git clone https://github.com/<you>/OSINT_Platform-VibeCoding.git
 cd OSINT_Platform-VibeCoding
-
-make install   # npm install (root + backend + frontend workspaces)
-make dev       # backend on :4000, frontend on :3000
+npm install
+npm run dev
 ```
 
-Open **http://localhost:3000**. Wildfire markers show up after the first poll, a few seconds after startup.
+**Windows** (PowerShell; close and reopen it after the two installs):
 
-No `make`? Use `npm install` and `npm run dev`.
+```powershell
+winget install OpenJS.NodeJS.LTS Git.Git
+git clone https://github.com/<you>/OSINT_Platform-VibeCoding.git
+cd OSINT_Platform-VibeCoding
+npm install
+npm run dev
+```
+
+**Linux** (any distro, via [nvm](https://github.com/nvm-sh/nvm); install git with your package manager if `git --version` fails):
+
+```bash
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+source ~/.nvm/nvm.sh
+nvm install --lts
+git clone https://github.com/<you>/OSINT_Platform-VibeCoding.git
+cd OSINT_Platform-VibeCoding
+npm install
+npm run dev
+```
+
+Open **http://localhost:3000**. The backend runs on :4000, and wildfire markers show up a few seconds after startup. Stop it with `Ctrl+C`; start it again with `npm run dev` (you'll do this after every new source).
+
+Already have Node? Check with `node -v`, then skip straight to `git clone`. On macOS and Linux, `make install` and `make dev` do the same as the npm commands.
+
+Stuck?
+
+- **Windows: "running scripts is disabled on this system"**: run `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once, or use `npm.cmd` instead of `npm`.
+- **`npm install` fails building `better-sqlite3`**: your Node is too old or too new for a prebuilt binary. Install the LTS version (`nvm install --lts`, or the LTS installer from [nodejs.org](https://nodejs.org)).
+- **Port 3000 or 4000 already in use**: stop the other app, or run the backend with a different `PORT`.
 
 ### Docker (optional)
 
@@ -56,7 +85,7 @@ Paste this into your AI tool of choice, from the repo root:
 
 > Read `skills/onboard-source/SKILL.md` and follow it. Use `sources.d/eonet_wildfires.yaml` as the template. Add a new source for NASA EONET open volcano events from `https://eonet.gsfc.nasa.gov/api/v3/events/geojson?category=volcanoes&status=open`. Put it in the `Hazards` group with the `volcano` icon. Volcano events keep their eruption start date, which can be months old, so do not copy the template's `ttl`. Run the verification steps in the skill and show me the output.
 
-Then restart `make dev` (sources load only at startup) and look for the new layer in the legend.
+Then stop the dev server (`Ctrl+C`) and run `npm run dev` again (sources load only at startup) and look for the new layer in the legend.
 
 Stuck? Diff your file against `sources.d/eonet_wildfires.yaml`. Almost everything carries over, except `ttl`: if the layer shows up and then empties a minute later, delete that line.
 
@@ -67,6 +96,7 @@ Same prompt, different URL. Some keyless feeds to try:
 - **Wikipedia articles near Ann Arbor**: `https://en.wikipedia.org/w/api.php?action=query&list=geosearch&gscoord=42.2780%7C-83.7382&gsradius=10000&gslimit=100&format=json` (JSON, records at `query.geosearch`, id `pageid`, coordinates `lat`/`lon`).
 - **USGS earthquakes**: `https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson` (GeoJSON; colour by magnitude).
 - **ISS position**: `https://api.wheretheiss.at/v1/satellites/25544` (a single JSON object; use `recording.mode: append` and a trail).
+- **Wildfires outside the US (GDACS)**: `https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH?eventlist=WF` (GeoJSON points, id `properties.eventid`, name `properties.name`, colour by `properties.alertlevel`). EONET's wildfire feed only carries US incidents; GDACS is the UN/EU global alert system. Its events are weeks old, so leave out `ttl`. Swap `WF` for `EQ`, `TC`, `FL` or `VO` for earthquakes, cyclones, floods or volcanoes.
 - **Other EONET categories**: `severeStorms`, `seaLakeIce`, `floods`, `dustHaze`, and more at `https://eonet.gsfc.nasa.gov/api/v3/categories`.
 - Anything else with coordinates in it. A feed without lat/lon can't go on the map (the Tor Onionoo API, for example, no longer includes them).
 
