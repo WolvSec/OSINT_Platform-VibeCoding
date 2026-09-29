@@ -4,6 +4,8 @@ A small open-source intelligence dashboard: public data feeds plotted live on a 
 
 This repo is the starter kit for the WolvSec talk **"Make your own OSINT platform"**. It ships with one source (NASA EONET wildfires, no API key) so the globe works on first run. Your job is to add more.
 
+Slides: [wolvsec-osint-talk.pptx](https://github.com/WolvSec/OSINT_Platform-VibeCoding/releases/latest/download/wolvsec-osint-talk.pptx)
+
 ## Credits
 
 - Based on Lenin Alevski's [Vibe Coding an OSINT Platform](https://github.com/Alevsk/vibe-coding-osint-platform) workshop from the DEF CON 34 Recon Village.
