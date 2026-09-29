@@ -1,0 +1,2 @@
+# LF everywhere, including Windows checkouts (prettier and the YAML tests expect it).
+* text=auto eol=lf

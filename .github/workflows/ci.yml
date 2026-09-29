@@ -21,9 +21,7 @@ jobs:
           node-version: lts/*
           cache: npm
       - run: npm ci
-      # Windows checkouts get CRLF line endings, which prettier's check would flag.
-      - if: matrix.os == 'ubuntu-latest'
-        run: npm run format:check
+      - run: npm run format:check
       - run: npm run lint
       - run: npm test
       - run: npm run build

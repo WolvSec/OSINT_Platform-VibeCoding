@@ -357,7 +357,7 @@ describe('Ingestion Scheduler', () => {
     fs.writeFileSync(path.join(dir, 'good.yaml'), good);
     fs.writeFileSync(
       path.join(dir, 'bad.yaml'),
-      good.replace(/^source_type:.*\n/m, '').replace('name: eonet_wildfires', 'name: broken')
+      good.replace(/^source_type:.*\r?\n/m, '').replace('name: eonet_wildfires', 'name: broken')
     );
     const err = jest.spyOn(console, 'error').mockImplementation(() => undefined);
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
