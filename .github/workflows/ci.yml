@@ -13,12 +13,14 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
+        # README minimum (22) and current LTS.
+        node: [22, lts/*]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: lts/*
+          node-version: ${{ matrix.node }}
           cache: npm
       - run: npm ci
       - run: npm run format:check
@@ -26,3 +28,17 @@ jobs:
       - run: npm test
       - run: npm run check-source
       - run: npm run build
+      # Real fetch in the OS default shell (PowerShell on Windows), as a student would run it.
+      # ponytail: hits NASA EONET live, so an EONET outage fails CI; mock it if that gets noisy.
+      - run: npm run check-source -- eonet_wildfires
+      - name: Backend serves the source
+        shell: bash
+        run: |
+          npm start --prefix backend > backend.log 2>&1 &
+          for i in $(seq 1 45); do
+            npm run check-source -- eonet_wildfires > check.txt 2>&1 || true
+            grep -q "backend has" check.txt && break
+            sleep 2
+          done
+          cat check.txt backend.log
+          grep -q "backend has" check.txt
