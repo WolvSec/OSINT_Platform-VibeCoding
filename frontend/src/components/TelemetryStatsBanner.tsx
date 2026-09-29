@@ -11,7 +11,7 @@ export interface TelemetryStatsBannerProps {
 
 const numberFormat = new Intl.NumberFormat('en-US');
 
-/** Top-left HUD panel: wordmark, a live tick/cross and the entity count. */
+/** Top-left HUD panel: wordmark, a tick (working) or cross (offline) and the entity count. */
 export const TelemetryStatsBanner: FC<TelemetryStatsBannerProps> = ({
   isConnected,
   isReconnecting
@@ -21,12 +21,13 @@ export const TelemetryStatsBanner: FC<TelemetryStatsBannerProps> = ({
   let statusLabel = 'Offline';
   let statusHint = 'Disconnected from the backend';
   if (isConnected) {
-    statusLabel = 'Live';
+    statusLabel = 'Working';
     statusHint = 'Connected to the backend';
   } else if (isReconnecting) {
-    statusLabel = 'Reconnecting';
+    statusLabel = 'Retrying';
     statusHint = 'Connection dropped, retrying';
   }
+  const statusColor = isConnected ? hud.accent : hud.danger;
 
   return (
     <HudPanel
@@ -46,9 +47,9 @@ export const TelemetryStatsBanner: FC<TelemetryStatsBannerProps> = ({
         <Box
           sx={{ ...displayTitle, fontSize: '1.25rem', color: hud.textPrimary, lineHeight: 0.95 }}
         >
-          OSINT
+          WolvSec
         </Box>
-        <Box sx={{ ...eyebrow, fontSize: '0.5625rem', color: hud.accent, mt: 0.4 }}>WolvSec</Box>
+        <Box sx={{ ...eyebrow, fontSize: '0.5625rem', color: hud.accent, mt: 0.4 }}>OSINT</Box>
       </Box>
 
       <PanelDivider />
@@ -57,15 +58,14 @@ export const TelemetryStatsBanner: FC<TelemetryStatsBannerProps> = ({
         <Box
           role="status"
           aria-label={`Connection status: ${statusLabel}`}
-          sx={{
-            flexShrink: 0,
-            fontSize: '1.25rem',
-            fontWeight: 900,
-            lineHeight: 1,
-            color: isConnected ? hud.accent : hud.danger
-          }}
+          sx={{ flexShrink: 0, textAlign: 'center', color: statusColor }}
         >
-          <span aria-hidden>{isConnected ? '✓' : '✗'}</span>
+          <Box aria-hidden sx={{ fontSize: '1.25rem', fontWeight: 900, lineHeight: 1 }}>
+            {isConnected ? '✓' : '✗'}
+          </Box>
+          <Box sx={{ ...eyebrow, fontSize: '0.5625rem', color: statusColor, mt: 0.3 }}>
+            {statusLabel}
+          </Box>
         </Box>
       </Tooltip>
 

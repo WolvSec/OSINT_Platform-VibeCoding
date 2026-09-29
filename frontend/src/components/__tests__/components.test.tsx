@@ -24,10 +24,13 @@ const renderWithProviders = (ui: ReactElement) =>
 describe('Tactical HUD Components', () => {
   it('TelemetryStatsBanner renders a live tick and the brand', () => {
     renderWithProviders(<TelemetryStatsBanner isConnected={true} isReconnecting={false} />);
-    expect(screen.getByRole('status', { name: /connection status: live/i })).toHaveTextContent('✓');
+    expect(screen.getByRole('status', { name: /connection status: working/i })).toHaveTextContent(
+      '✓'
+    );
     expect(screen.queryByRole('group', { name: 'Message rate' })).not.toBeInTheDocument();
     // Brand block: WolvSec OSINT, not the old product name.
     expect(screen.getByText('WolvSec')).toBeInTheDocument();
+    expect(screen.getByText('Working')).toBeInTheDocument();
     expect(screen.getByText('OSINT')).toBeInTheDocument();
     expect(screen.queryByText(/reconvillage/i)).not.toBeInTheDocument();
   });
@@ -36,7 +39,7 @@ describe('Tactical HUD Components', () => {
     const { unmount } = renderWithProviders(
       <TelemetryStatsBanner isConnected={false} isReconnecting={true} />
     );
-    expect(screen.getByRole('status', { name: /reconnecting/i })).toHaveTextContent('✗');
+    expect(screen.getByRole('status', { name: /retrying/i })).toHaveTextContent('✗');
     unmount();
 
     renderWithProviders(<TelemetryStatsBanner isConnected={false} isReconnecting={false} />);
