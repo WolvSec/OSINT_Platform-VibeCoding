@@ -35,4 +35,4 @@ Use the `npm` commands: they work in every shell. `make <target>` does the same 
 | `npm run format` / `npm run format:check` | Prettier write / check (CI runs the check) |
 | `npm run build` | compile backend and frontend |
 
-Node 22.22.2 or newer. Environment variables keep the `MKOSINT_` prefix; see `docs/development.md`.
+Node 24 or newer (Node 22 ships npm 10, which tries to compile `better-sqlite3` and fails without a C++ toolchain). Environment variables keep the `MKOSINT_` prefix; see `docs/development.md`.

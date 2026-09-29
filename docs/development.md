@@ -4,10 +4,10 @@ How to install, run, test and check the platform locally.
 
 ## Prerequisites
 
-- **Node.js 22.22.2 or newer** (root `package.json` `engines.node` is `>=22.22.2`; `better-sqlite3`, `cesium` and `jsdom` all need Node 22). CI runs on Node 22.
+- **Node.js 24 or newer** (root `package.json` `engines.node` is `>=24`, enforced by `.npmrc` `engine-strict`). `better-sqlite3` 13 bundles prebuilt binaries, but npm 10 (shipped with Node 22) still runs `node-gyp rebuild` for it, which fails without Visual Studio / Xcode / make. npm 11 (Node 24+) skips that. CI runs Node 24 and the current release on Linux, macOS and Windows.
 - **npm**. The repo uses npm workspaces (`backend`, `frontend`) and ships a `package-lock.json`.
 - **make**, optional. Every Makefile target wraps an npm script.
-- A C/C++ toolchain only if `better-sqlite3` has no prebuilt binary for your platform.
+- A C/C++ toolchain only if `better-sqlite3` has no prebuilt binary for your platform (it ships win32, darwin and linux, x64 and arm64).
 - Internet access, for the data feeds and the globe's map tiles.
 
 ## Install
@@ -99,4 +99,4 @@ make docker-build   # build the image only
 
 ## Continuous integration
 
-`.github/workflows/ci.yml` runs on every push and pull request to `main` (Node 22): `npm ci`, `npm run format:check`, `npm run lint`, `npm test`, `npm run build`. Reproduce locally with `npm run format:check && make lint test build`.
+`.github/workflows/ci.yml` runs on every push and pull request to `main`/`master` on Linux, macOS and Windows (Node 24 and current): `npm ci`, `npm run format:check`, `npm run lint`, `npm test`, `npm run build`, then `npm run check-source` against the live wildfire feed and a running backend. Reproduce locally with `npm run format:check && make lint test build`.

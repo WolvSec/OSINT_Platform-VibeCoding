@@ -3,7 +3,7 @@
 # OSINT Platform single-container image: one Node process serves the REST API, the WebSocket feed and
 # the built frontend on port 4000. See docs/development.md#deployment.
 
-ARG NODE_VERSION=22
+ARG NODE_VERSION=24
 
 # ---------------------------------------------------------------------------------------------
 # build: install every workspace (dev deps included) and compile backend + frontend.

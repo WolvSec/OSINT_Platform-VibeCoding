@@ -13,8 +13,8 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        # README minimum (22) and current LTS.
-        node: [22, lts/*]
+        # README minimum (24) and the newest release.
+        node: [24, current]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4

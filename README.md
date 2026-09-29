@@ -13,7 +13,7 @@ Slides: [wolvsec-osint-talk.pptx](https://github.com/WolvSec/OSINT_Platform-Vibe
 
 ## Quickstart
 
-You need **Node.js 22 or newer** and **git**. Click **"Use this template"** (or fork) on GitHub first, then copy the block for your OS into a terminal.
+You need **Node.js 24 or newer** and **git**. Click **"Use this template"** (or fork) on GitHub first, then copy the block for your OS into a terminal.
 
 **macOS** (Terminal, with [Homebrew](https://brew.sh)):
 
@@ -50,12 +50,12 @@ npm run dev
 
 Open **http://localhost:3000**. The backend runs on :4000, and wildfire markers show up a few seconds after startup. Stop it with `Ctrl+C`; start it again with `npm run dev` (you'll do this after every new source).
 
-Already have Node? Check with `node -v`, then skip straight to `git clone`. On macOS and Linux, `make install` and `make dev` do the same as the npm commands.
+Already have Node? Check with `node -v` (24 or newer; on 22, install the LTS again), then skip straight to `git clone`. On macOS and Linux, `make install` and `make dev` do the same as the npm commands.
 
 Stuck?
 
 - **Windows: "running scripts is disabled on this system"**: run `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once, or use `npm.cmd` instead of `npm`.
-- **`npm install` fails building `better-sqlite3`**: your Node is too old or too new for a prebuilt binary. Install the LTS version (`nvm install --lts`, or the LTS installer from [nodejs.org](https://nodejs.org)).
+- **`npm install` fails with `Unsupported engine`, or while building `better-sqlite3` (`gyp ERR! find VS`)**: your Node is older than 24. Install the current LTS (`nvm install --lts`, `winget install OpenJS.NodeJS.LTS`, or the installer from [nodejs.org](https://nodejs.org)), open a new terminal, delete `node_modules`, and run `npm install` again.
 - **Port 3000 or 4000 already in use**: stop the other app, or run the backend with a different `PORT`.
 
 ### Docker (optional)
