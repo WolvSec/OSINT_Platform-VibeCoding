@@ -1,0 +1,62 @@
+# JSON example: the endpoint returns a top-level JSON array, one object per measurement.
+# Shows: parser.format json (no records_path), color_by stops, coalesce() in an expression.
+# Source: Safecast public API (https://api.safecast.org), no key. The public endpoint serves
+# historical measurements, so there is no ttl.
+schema_version: 1
+name: safecast_radiation
+source_type: safecast
+layer_type: radiation
+display_name: 'Safecast Radiation'
+enabled: true
+
+layer:
+  id: radiation
+  name: Radiation
+  group: Environment
+  description: Safecast volunteer sensor readings
+
+display:
+  icon: radiation
+  color: '#ffcc00'
+  # Counts per minute: ~30 CPM is normal background; hundreds is worth a look.
+  color_by:
+    field: metadata.cpm
+    stops: [[0, '#7ee787'], [60, '#ffcc00'], [300, '#ff7b00'], [1000, '#ff0054']]
+  size: 0.9
+  fields:
+    - { path: metadata.cpm, label: Reading, format: number, precision: 0, suffix: ' CPM' }
+    - { path: metadata.unit, label: Unit }
+    - { path: timestamp, label: Captured, format: datetime }
+
+transport:
+  type: http_poll
+  url: 'https://api.safecast.org/measurements.json?limit=100'
+  headers:
+    Accept: 'application/json'
+  timeout: '15s'
+  interval: '5m'
+  retry:
+    max_attempts: 3
+    backoff: exponential
+    initial_delay: '2s'
+    max_delay: '30s'
+
+parser:
+  format: json
+  max_records: 100
+
+entity:
+  external_id: 'id'
+  # device_id is often null; fall back to the measurement id.
+  name: "=concat('Safecast ', coalesce(device_id, id))"
+  metadata:
+    cpm: 'value'
+    unit: 'unit'
+
+observation:
+  latitude: 'latitude'
+  longitude: 'longitude'
+  timestamp: 'captured_at'
+
+recording:
+  mode: upsert

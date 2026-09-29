@@ -1,0 +1,29 @@
+# Single-container OSINT Platform: UI, REST API and WebSocket on http://localhost:4000.
+#   docker compose up -d --build     (or: make docker-up)
+name: osint-platform
+
+services:
+  osint-platform:
+    build: .
+    image: osint-platform:latest
+    container_name: osint-platform
+    restart: unless-stopped
+    ports:
+      - '4000:4000'
+    env_file:
+      - path: backend/.env
+        required: false
+    environment:
+      # Container layout; override the rest (MKOSINT_*, INGEST_ENABLED, API keys) in backend/.env.
+      DB_PATH: /data/osint.db
+      SOURCES_DIR: /app/sources.d
+      PORT: '4000'
+      MKOSINT_APP_NAME: ${MKOSINT_APP_NAME:-WolvSec OSINT}
+    volumes:
+      - osint-data:/data
+      # Sources are read at startup: edit on the host, then `docker compose restart`.
+      - ./sources.d:/app/sources.d:ro
+    stop_grace_period: 15s
+
+volumes:
+  osint-data:

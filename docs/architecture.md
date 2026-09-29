@@ -1,0 +1,245 @@
+# Architecture
+
+The platform is an NPM-workspaces monorepo with two packages and one data directory:
+
+| Path | Role |
+| :-- | :-- |
+| `backend/` | Node.js + Express + TypeScript. Loads YAML source definitions, polls public feeds, writes to SQLite, serves a REST API and pushes live updates over WebSocket. |
+| `frontend/` | Vite + React 18 + Redux Toolkit (with RTK Query) + MUI + CesiumJS. Renders the 3D globe, the layer legend, search and the entity inspector. |
+| `sources.d/` | Declarative YAML source definitions, one file per feed. See [data-sources.md](data-sources.md). |
+
+The backend runs on port 4000 and the Vite dev server on port 3000. In development, Vite proxies `/api` and `/ws` to the backend, so the browser only ever talks to port 3000. See [development.md](development.md). In the Docker image the backend serves the built frontend itself, so the UI, `/api`, `/config.json` and `/ws` all share port 4000 (see [development.md#deployment](development.md#deployment)).
+
+## Data flow
+
+```mermaid
+flowchart LR
+  subgraph Feeds[Public HTTP feeds]
+    F1[NASA EONET and any feed you add]
+  end
+
+  subgraph Backend[backend :4000]
+    YL[yaml-loader<br/>sources.d/*.yaml] --> SCH[IngestionScheduler]
+    SCH -->|per-source interval| HF[http-fetcher<br/>timeout + retry]
+    HF --> PR[parsers<br/>json / geojson / xml / csv / rss]
+    PR --> FL[passesFilter]
+    FL --> FM[field-mapper<br/>mapRecord]
+    FM --> DB[(SQLite<br/>mk-osint.db)]
+    SCH -->|onEntityUpdate<br/>new or moved only| BC[TelemetryBroadcaster]
+    DB --> API[Express REST<br/>/api/*]
+    DB --> WSS[WebSocket server<br/>/ws/telemetry]
+    BC --> WSS
+  end
+
+  subgraph Frontend[frontend :3000]
+    HOOK[useWebSocket] --> STORE[Redux store]
+    RTKQ[RTK Query osintApi] --> STORE
+    STORE --> GLOBE[GlobeView / Cesium]
+    STORE --> HUD[Legend, search, inspector]
+  end
+
+  F1 --> HF
+  WSS -- initial_state / entity_update / ping --> HOOK
+  API -- JSON --> RTKQ
+```
+
+At startup `backend/src/index.ts`:
+
+1. Loads `.env` with `dotenv`.
+2. Opens the database with `initDatabase(DB_PATH)`.
+3. Builds the Express app (`createApp`) and a single `http.Server` for it.
+4. Attaches the WebSocket server to the same HTTP server on `/ws/telemetry`.
+5. Creates an `IngestionScheduler` and wires `scheduler.onEntityUpdate` to `broadcaster.broadcastEntityUpdate`.
+6. Starts listening. If `INGEST_ENABLED=false`, it only registers sources (`initSources()`); otherwise it calls `scheduler.start()`.
+
+`SIGINT` and `SIGTERM` stop the scheduler, terminate open sockets, close the HTTP server and then the database.
+
+## Ingestion pipeline
+
+All code lives in `backend/src/engine/`.
+
+### yaml-loader (`yaml-loader.ts`)
+
+`loadSourcesFromDir(dir)` reads every `*.yaml` / `*.yml` file in the directory in sorted order and parses it with the `yaml` package. Each parsed file goes through `validateSourceConfig()`, which returns every problem it finds: a missing or empty `name`, `source_type`, `transport.type`, `transport.url`, `parser.format`, `entity.external_id`, `observation.latitude` or `observation.longitude`; a `schema_version` other than `1` (`SUPPORTED_SCHEMA_VERSIONS`; absent means 1); a `transport.retry.backoff` outside `exponential`, `linear`, `fixed`; or an `observation.scale` entry that is not one of `SCALABLE_OBSERVATION_FIELDS` or not a finite number; a `parser.format` outside `PARSER_FORMATS`, malformed `parser.csv` / `array_columns`, a `recording.mode` outside `RECORDING_MODES`, an unparseable `recording.max_age`, a filter rule with neither `field` nor `expr`, or an expression with a syntax error. `lookups:` file tables are then loaded by `resolveLookups()`; a failure there also skips the file. Invalid files are logged as `Skipping invalid source definition <path>: <problems>` and unparseable files are logged too; both are skipped and never abort the load.
+
+`entity.category` is an open set: any lowercase snake_case id is valid (`isEntityCategory`). The six legacy categories stay exported as `ENTITY_CATEGORIES` / `LEGACY_ENTITY_CATEGORIES`:
+
+```
+satellite, aircraft, geological, radiation, maritime, atc_zone
+```
+
+The optional `layer:` and `display:` blocks are validated and resolved by `layer-display.ts` (`validateLayerDisplay()` feeds `validateSourceConfig()`; `resolveLayerDisplay()` applies defaults). Every config returned by the loader carries a resolved `layer` and `display`, and `entity.category` defaults to `layer.id`. An unknown `display.icon` only warns and becomes `dot`; any other bad value rejects the file. See [data-sources.md](data-sources.md#layer-and-display).
+
+`parseDurationSeconds()` turns interval and timeout strings (`"30s"`, `"5m"`, `"1h"`, `"500ms"`, or a bare number of seconds) into whole seconds.
+
+The full schema is documented in [data-sources.md](data-sources.md).
+
+### scheduler (`scheduler.ts`)
+
+`IngestionScheduler` owns the polling loop.
+
+- `initSources()` loads the configs and upserts one row per source into the `sources` table (`id` = `name`, `name` = `display_name`, `type` = `source_type`, `transport` = `transport.type`, `update_interval_sec` = parsed interval, `enabled` = 0 or 1), then stores the resolved `layer` / `display` as JSON on the same row (`source-presentation.ts`). If a row cannot be written, the error is logged and that source is dropped from the configs (never polled) instead of aborting startup.
+- `start()` calls `initSources()`, then for each source that is not `enabled: false` polls once immediately and again every `transport.interval` (default 60 seconds) with `setInterval`.
+- `pollSource(config)` runs one fetch, parse, filter, map and persist cycle inside a single SQLite transaction and returns the number of records written. Errors are logged with the source name and the method returns 0, so one failing feed never stops the others. Counters for the poll (`written`, `skipped`, `filtered`, `unlocated`, `duplicates`, `stale`) are kept in `lastStats`.
+- For orbital formats (`tle`, `omm_json`) the parsed element sets are cached per source and propagated to "now" before mapping. `repropagate(config)` re-propagates the cached sets without fetching; `start()` schedules it every `transport.propagate_interval`.
+
+Within a poll:
+
+1. Each raw record is checked against the source's `filter` rules. Excluded records are counted separately from malformed ones.
+2. `mapRecord` turns the record into an entity and an observation. Records without an id or valid coordinates are skipped, never plotted at (0, 0).
+3. The entity row is upserted by its prefixed id (`<source name>:<external_id>`).
+4. The observation is written according to `recording.mode` (default `append`):
+   - `upsert`: one observation per entity (`obs_<entity id>`), updated in place.
+   - `append`: `INSERT OR IGNORE`, so repeat polls of the same instant are no-ops. After the transaction, each touched entity is pruned to its newest 200 observations (`MAX_OBS_PER_ENTITY`).
+5. The scheduler keeps the last `latitude,longitude,altitude` it saw for every entity id in memory. Only entities that are new or whose position changed are collected for broadcast.
+
+After the transaction commits, `onEntityUpdate` is called for each changed entity.
+
+- `ingestRecords(config, records)` is the filter, map and persist half of a poll (steps 1-5 above plus the broadcast). `pollSource()` calls it with the records of one poll; streaming sources call it with each batch. `parseContent(config, text)` runs the source's parser on one body or one stream message.
+- A source whose `transport.type` is `websocket` or `sse` is not polled: `start()` opens its stream with `startStream()` (`transports/`), and `stop()` closes every stream.
+
+### transports (`transports/`), env (`env.ts`), auth (`auth.ts`), pagination (`pagination.ts`)
+
+- `env.ts` resolves `${NAME}` / `${NAME:-default}` placeholders (`substituteEnv`), lists unset ones (`missingEnvVars`, used by the loader to skip a source) and masks secret values in messages (`maskSecrets`). Source configs keep the unresolved text; resolution happens per request.
+- `transport-config.ts` holds the types and validation (`validateTransportExtras`, called from `validateSourceConfig`) for `auth`, `body`, `max_response_bytes`, `pagination`, `subscribe` and `batch_window`.
+- `transports/request.ts` `resolveRequest()` substitutes env, applies auth (`auth.ts` `applyAuth`: bearer, api_key, basic, OAuth2 client credentials with an in-memory token cache) and encodes the body.
+- `transports/http.ts` `fetchHttpRecords()` is one HTTP poll: it resolves the request, then calls `fetchUrl()` once, or once per page through `pagination.ts` `fetchPaginated()`, parsing each page with the scheduler's parser and concatenating the records. Errors are re-thrown with secrets masked.
+- `transports/stream.ts` `StreamRunner` is the shared base for `transports/websocket.ts` (the `ws` client) and `transports/sse.ts` (fetch streaming plus `SseDecoder`): it parses each message, buffers records for `batch_window`, hands each batch to `ingestRecords`, and reconnects with `retryDelayMs()`.
+### retention (`retention.ts`)
+
+`startRetention(db, { getConfigs, onRemove })` is started from `index.ts` once the server is listening. It sweeps immediately and then every 60 seconds (`RETENTION_INTERVAL_MS`):
+
+1. `expireEntities()` deletes, per source with a `display.ttl`, every entity whose `timestamp` is older than the ttl, together with its observations. The removed ids go to `onRemove`, which `index.ts` wires to `broadcaster.broadcastEntityRemove()` (the WS `entity_remove` frame).
+2. `enforceDbSizeLimit()` is a size guard. When the pages in use exceed `MKOSINT_DB_MAX_MB` (default 500; `0` disables it), it deletes the oldest observations in steps until usage is under 90% of the ceiling, then runs `PRAGMA incremental_vacuum` to hand the freed pages back to the OS.
+
+Errors are logged and never stop the timer, which is `unref()`'d.
+
+The scheduler's in-memory last-position cache is not cleared on expiry, so an expired entity that reappears at exactly the same position is written to the database but not re-broadcast until it moves.
+
+### http-fetcher (`http-fetcher.ts`)
+
+`fetchUrl()` uses the global `fetch` with an `AbortController` timeout. It sends `User-Agent: MK-OSINT/1.0` plus any configured headers, treats any non-2xx status as a failure, and returns the body as text. An optional request `body` is sent as-is. The body is read through `readTextLimited()`, which aborts with `ResponseTooLargeError` (never retried) once it exceeds `maxResponseBytes` (default 50 MB), checking `Content-Length` first and then the streamed byte count. Failed attempts are retried after `retryDelayMs(attempt, backoff, initialDelayMs, maxDelayMs)`: `exponential` (`initialDelayMs * 2^(attempt-1)`), `linear` (`initialDelayMs * attempt`) or `fixed` (`initialDelayMs`), always capped at `maxDelayMs`. After the last attempt it throws the last error.
+
+### retry (`retry.ts`)
+
+`retry.ts` holds `BACKOFF_STRATEGIES`, `retryDelayMs()` and `DEFAULT_RETRY`, the single default retry policy: 3 attempts, 1 second initial delay, 15 second cap, exponential backoff. Both `fetchUrl()` and the scheduler fall back to it, so there is no second set of defaults. The scheduler passes these values from the YAML: `timeout` (default 10s), `retry.max_attempts`, `retry.initial_delay`, `retry.max_delay` and `retry.backoff`, each defaulting to `DEFAULT_RETRY`.
+
+### parsers (`parsers/`)
+
+`parsePayload(content, format, recordsPath, maxRecords, options)` dispatches on `parser.format` and then truncates to `max_records` if set. `options` is the source's `parser` block (`csv`, `object_to_records`, `key_field`, `array_columns`).
+
+| Format | Implementation | Behaviour |
+| :-- | :-- | :-- |
+| `json` | `JSON.parse` | Walks `records_path` (dot notation). A top-level array is used as-is; an object is wrapped as a single record (for example, the ISS endpoint). |
+| `geojson` | `JSON.parse` | Same, but `records_path` defaults to `features`. |
+| `xml` | `fast-xml-parser` with `ignoreAttributes: false` | Walks `records_path` to the repeated element (for example `rss.channel.item`). A single element is wrapped into a one-element array. |
+| `csv` | `papaparse` with `header: true`, `skipEmptyLines: true` | The header row becomes the record keys. Values stay strings and are coerced later by the mapper. With `parser.csv`, lines are pre-filtered (`skip_lines`, `comment_prefix`), split by the given delimiter or on whitespace, and keyed by the header, `columns` or `c0..cN`. |
+| `json` reshaping | `reshapeJson()` in `json-parser.ts` | `object_to_records` turns an object map into records (key in `key_field`, default `_key`); `array_columns` zips array rows with a column list or a header row. |
+| `rss` | `rss-parser.ts`, `fast-xml-parser` | Finds RSS 2.0 / RDF / Atom items and normalizes them to `{title, link, description, published, guid, categories, author, lat, lon}` (GeoRSS simple, GML and W3C geo). |
+| `tle` | `tle-parser.ts` | 3-line and 2-line element sets to element records carrying `line1`/`line2`. |
+| `omm_json` | `tle-parser.ts` | CelesTrak GP JSON; `ommToTle()` synthesizes canonical TLE lines (with checksums) so both formats share one SGP4 path. |
+
+### orbit (`orbit.ts`)
+
+`propagateRecords(records, date)` runs SGP4 (`satellite.js` v5, the last CommonJS release) on each element record and adds `lat`, `lon`, `alt` (m), `speed` (ECI speed, m/s), `heading` (bearing of the ground track over the next second) and `timestamp`. Parsed `satrec`s are cached in a `WeakMap` keyed by the element record, so re-propagation ticks only pay for the propagation. Sets that SGP4 rejects (decayed, malformed) are dropped.
+
+### expressions (`expressions.ts`), lookups (`lookups.ts`), dedupe (`dedupe.ts`)
+
+- `expressions.ts` is a tokenizer, Pratt parser and tree-walking evaluator for `=expr` mapping values and `filter[].expr`. There is no `eval`/`Function`; identifiers read only own properties of the record (never `__proto__`, `constructor` or `prototype`), and calls resolve only to a fixed helper table. Compiled expressions are cached by source text. `collectExpressionErrors()` is called by `validateSourceConfig()`, so syntax errors reject the file at load.
+- `lookups.ts` resolves the top-level `lookups:` block (inline maps, or `.json`/`.csv` files confined to the sources directory) once at load.
+- `dedupe.ts` computes the `recording.mode: dedupe` identity: sha256 over a key-sorted JSON of `dedupe_fields` values, or of the mapped entity.
+
+### field-mapper (`field-mapper.ts`)
+
+- `resolvePath(obj, path)` resolves dot and bracket paths such as `geometry.coordinates[1]`.
+- `resolveValue(obj, expr)` tries the expression as a path first. If that yields nothing and the expression is a numeric string, it returns the number as a literal, which is why `altitude: '0'` gives 0.
+- `passesFilter(raw, rules)` evaluates the `filter` list (`in` and `not_empty`).
+- `computeDerived(raw, derived)` builds computed metadata from `map` lookups, `{path}` templates or plain copies.
+- `mapRecord(raw, config, sourceId)` produces the `EntityRecord` and `ObservationRecord`. The entity id is `<sourceId>:<external_id>`, so feeds that reuse an external id never collide. Latitude, longitude, altitude, speed and heading are multiplied by any `observation.scale` factor; altitude is stored in metres. It normalizes timestamps (epoch seconds, epoch milliseconds or anything `Date.parse` accepts) to ISO 8601, falling back to ingest time. It also builds a deterministic observation id, which is the basis of deduplication:
+  - `upsert`: `obs_<entity id>`
+  - `append` with a source timestamp: `obs_<entity id>_<epoch_ms>`
+  - `append` without a source timestamp: `obs_<entity id>_<lat.toFixed(4)>_<lon.toFixed(4)>`, so a stationary target does not create a new row on every poll.
+  - `dedupe`: `obs_<entity id>_<sha256>`. The scheduler skips a record whose id already exists (before touching the entity), otherwise upserts the entity and inserts the observation, replacing a row with the same `(entity_id, timestamp)`.
+- `resolveValue(obj, expr, ctx)` evaluates values starting with `=` as expressions; `expressionContext(config)` supplies the lookup tables. `isUnlocated(raw, config)` lets the scheduler count records dropped under `observation.optional`.
+- Records older than `recording.max_age` are dropped by the scheduler after mapping.
+
+## Database schema
+
+Defined in `backend/src/db/database.ts`. The database runs in WAL mode (`journal_mode = WAL`). A new database file is created with `auto_vacuum = INCREMENTAL` so the retention job can shrink it; an existing file keeps its mode (delete it to switch). Tables are created with `CREATE TABLE IF NOT EXISTS` on every start. The only migration is additive: `layer` and `display` columns are added to `sources` when missing.
+
+### `sources`
+
+| Column | Type | Notes |
+| :-- | :-- | :-- |
+| `id` | TEXT PRIMARY KEY | The YAML `name`. |
+| `name` | TEXT NOT NULL | The YAML `display_name`, or `name` if absent. |
+| `type` | TEXT NOT NULL | The YAML `source_type`. |
+| `transport` | TEXT NOT NULL | The YAML `transport.type`, for example `http_poll`. |
+| `url` | TEXT NOT NULL | |
+| `update_interval_sec` | INTEGER NOT NULL DEFAULT 60 | |
+| `enabled` | INTEGER NOT NULL DEFAULT 1 | 0 or 1. Returned by the API as a boolean. |
+| `layer` | TEXT | Resolved YAML `layer` block as JSON. Returned as an object, or `null` for a row written before the column existed. |
+| `display` | TEXT | Resolved YAML `display` block as JSON. Same treatment as `layer`. |
+
+### `entities`
+
+| Column | Type | Notes |
+| :-- | :-- | :-- |
+| `id` | TEXT PRIMARY KEY | `<source name>:<external_id>`. |
+| `source_id` | TEXT NOT NULL | FK to `sources(id)`, `ON DELETE CASCADE`. |
+| `category` | TEXT NOT NULL | Indexed (`idx_entities_category`). |
+| `name` | TEXT NOT NULL | |
+| `latitude`, `longitude` | REAL NOT NULL | |
+| `altitude` | REAL NOT NULL DEFAULT 0.0 | Metres. |
+| `timestamp` | TEXT NOT NULL | ISO 8601. |
+| `metadata` | TEXT NOT NULL DEFAULT `'{}'` | JSON string. Returned by the API as an object. |
+
+Also indexed: `idx_entities_source_id`.
+
+### `observations`
+
+| Column | Type | Notes |
+| :-- | :-- | :-- |
+| `id` | TEXT PRIMARY KEY | Deterministic id from the mapper. |
+| `entity_id` | TEXT NOT NULL | FK to `entities(id)`, `ON DELETE CASCADE`. Indexed. |
+| `source_id` | TEXT NOT NULL | FK to `sources(id)`, `ON DELETE CASCADE`. |
+| `latitude`, `longitude` | REAL NOT NULL | |
+| `altitude`, `speed`, `heading` | REAL NOT NULL DEFAULT 0.0 | |
+| `timestamp` | TEXT NOT NULL | ISO 8601. Indexed. |
+| `raw_payload` | TEXT NOT NULL DEFAULT `'{}'` | The raw source record as a JSON string. Returned by the API as an object. |
+
+A unique index `ux_observations_entity_timestamp` on `(entity_id, timestamp)` enforces one observation per entity per instant. Together with the deterministic id and `INSERT OR IGNORE`, it prevents duplicate rows when a feed returns the same data on consecutive polls.
+
+Queries live in `backend/src/db/queries.ts`. All filters are bound as prepared-statement parameters. `getEntities()` and `getObservations()` return one page of rows plus `total`, a `COUNT(*)` over the same `WHERE` clause. `serializeSource()`, `serializeEntity()` and `serializeObservation()` (built on `parseJsonObject()`) turn `enabled` into a boolean and `metadata` / `raw_payload` into objects before rows leave the query layer. `getInitialSnapshot(perCategory)` uses `ROW_NUMBER() OVER (PARTITION BY category ORDER BY timestamp DESC)` to take the newest N entities per category, and adds each entity's latest `heading` and `speed` from its newest observation (null when it has none). This stops a high-frequency category such as aircraft from crowding the others out of the first paint.
+
+## REST API
+
+`backend/src/app.ts` mounts CORS, JSON body parsing, `GET /api/health`, `GET /api/openapi.yaml` (serves `api/openapi.yaml` next to the compiled code; the build copies it into `dist/`), and the router in `backend/src/api/index.ts` with `/api/sources`, `/api/entities` and `/api/observations`. `GET /config.json` (client-safe runtime settings, `backend/src/runtime-config.ts`) and, when enabled, the static frontend with SPA fallback (`backend/src/static-frontend.ts`) are mounted after the API router. `notFoundHandler` is registered last, so unknown routes get a JSON 404. Responses are always wrapped objects, never bare arrays. Errors use the envelope in `backend/src/api/errors.ts`. Full details are in [api.md](api.md).
+
+## WebSocket server and broadcaster
+
+`backend/src/websocket/server.ts` attaches a `ws` `WebSocketServer` to the HTTP server at `WS_PATH = '/ws/telemetry'`. On connection it:
+
+- registers the socket with the broadcaster;
+- sends one `initial_state` frame with all sources and a category-balanced snapshot of up to 300 entities per category (`SNAPSHOT_PER_CATEGORY`);
+- answers client `ping` messages with `pong` and treats client `pong` as a liveness signal.
+
+A heartbeat runs every 30 seconds (`HEARTBEAT_INTERVAL_MS`). Each round sends a protocol-level ping and an application-level `{"type":"ping"}` message, and terminates any socket that did not answer the previous round. The timer is `unref()`'d so it never keeps the process alive.
+
+`backend/src/websocket/broadcaster.ts` exports a singleton `TelemetryBroadcaster` that holds the set of live sockets and fans messages out to every open one. The scheduler calls `broadcastEntityUpdate` only for new or moved entities, so a feed that returns thousands of unchanged records produces no traffic. `broadcastEntityUpdate` normalises `metadata` to an object with `parseJsonObject()`, the same wire format as REST and `initial_state`; the frame also carries the mapper's `speed` and `heading`. `broadcastEntityRemove(ids)` sends `entity_remove` for entities the retention job expired.
+
+The message format is documented in [api.md](api.md#websocket-protocol).
+
+## Frontend
+
+`frontend/src/` is a Vite + React 18 app with a Redux Toolkit store (`store/`) and a CesiumJS globe.
+
+- `hooks/useWebSocket.ts` connects to `ws(s)://<page host>/ws/telemetry`, loads sources and entities from `initial_state`, applies `entity_update` / `entity_remove`, answers server pings, and reconnects with exponential backoff (3 s doubling to 30 s). `hooks/useTtlPruner.ts` drops entities older than their source's `display.ttl` every 15 seconds.
+- `store/slices/`: `entitiesSlice` (entities by id, selection, isolated layer, client-side trails), `sourcesSlice` (sources with their `layer` / `display`, per-source on/off toggles, browser-only) and `filterSlice` (globe imagery style). `store/api/osintApi.ts` is RTK Query over `/api` (the inspector uses it for observations).
+- `components/GlobeView.tsx` owns the Cesium `Viewer` and draws every entity as a billboard. Each marker's style comes from its source's `display` (`layerStyle.ts`): icon from the registry in `markerIcons.ts` (35 keys, the same list as `ICON_KEYS` in `backend/src/engine/layer-display.ts`), colour or `color_by`, size, rotation. `trails.ts` draws tracks for sources with `display.trail.enabled`. `globeStyles.ts` sets the base imagery.
+- `components/LayerControlDrawer.tsx` builds the legend from the sources' `layer` blocks, grouped by `layer.group` (`legend.ts`), with per-source switches.
+- `components/EntityDetailsDrawer.tsx` shows the selected entity: the source's `display.fields` first (`entityFields.ts`), then the remaining metadata and recent observations.
+- `components/SearchBox.tsx` searches loaded entities (Cmd/Ctrl+K). `components/TelemetryStatsBanner.tsx` shows connection status, message rate and entity count.
+- `runtimeConfig.ts` reads `/config.json` once at startup (app name, Cesium ion token, default globe style).
+
+Adding a source never requires a frontend change: a new `layer.id` shows up in the legend and a new `display` is drawn automatically.
