@@ -23,7 +23,6 @@ export interface WebSocketState {
   isConnected: boolean;
   isReconnecting: boolean;
   /** Messages received during the last one-second window. */
-  messageRate: number;
   /** Server timestamp of the most recent frame, or null before the first frame. */
   lastSeenTimestamp: string | null;
 }
@@ -55,9 +54,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}): WebSocketState 
   const dispatch = useDispatch();
   const [isConnected, setIsConnected] = useState(false);
   const [isReconnecting, setIsReconnecting] = useState(false);
-  const [messageRate, setMessageRate] = useState(0);
   const [lastSeenTimestamp, setLastSeenTimestamp] = useState<string | null>(null);
-  const messageCountRef = useRef(0);
   const socketRef = useRef<WebSocket | null>(null);
 
   const wsUrl = options.url ?? deriveTelemetryUrl(window.location);
@@ -100,7 +97,6 @@ export function useWebSocket(options: UseWebSocketOptions = {}): WebSocketState 
 
       ws.onmessage = (event: MessageEvent<string>) => {
         if (!isMounted) return;
-        messageCountRef.current += 1;
         let payload: TelemetryFrame;
         try {
           payload = JSON.parse(event.data) as TelemetryFrame;
@@ -139,14 +135,8 @@ export function useWebSocket(options: UseWebSocketOptions = {}): WebSocketState 
 
     connect();
 
-    const rateInterval = setInterval(() => {
-      setMessageRate(messageCountRef.current);
-      messageCountRef.current = 0;
-    }, 1000);
-
     return () => {
       isMounted = false;
-      clearInterval(rateInterval);
       if (reconnectTimer) clearTimeout(reconnectTimer);
       const socket = socketRef.current;
       socketRef.current = null;
@@ -161,5 +151,5 @@ export function useWebSocket(options: UseWebSocketOptions = {}): WebSocketState 
     };
   }, [wsUrl, baseReconnectInterval, maxReconnectInterval, dispatch]);
 
-  return { isConnected, isReconnecting, messageRate, lastSeenTimestamp };
+  return { isConnected, isReconnecting, lastSeenTimestamp };
 }

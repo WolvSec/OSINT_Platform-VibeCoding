@@ -239,8 +239,8 @@ The message format is documented in [api.md](api.md#websocket-protocol).
 - `components/GlobeView.tsx` owns the Cesium `Viewer` and draws every entity as a billboard. Each marker's style comes from its source's `display` (`layerStyle.ts`): icon from the registry in `markerIcons.ts` (35 keys, the same list as `ICON_KEYS` in `backend/src/engine/layer-display.ts`), colour or `color_by`, size, rotation. `trails.ts` draws tracks for sources with `display.trail.enabled`. `globeStyles.ts` sets the base imagery.
 - `components/LayerControlDrawer.tsx` builds the legend from the sources' `layer` blocks, grouped by `layer.group` (`legend.ts`), with per-source switches.
 - `components/EntityDetailsDrawer.tsx` shows the selected entity: the source's `display.fields` first (`entityFields.ts`), then the remaining metadata and recent observations.
-- `components/TelemetryStatsBanner.tsx` shows connection status, message rate and entity count.
-- `theme.ts` holds the design tokens (Michigan navy base, maize accent, cyan live signal; Russo One / Archivo / JetBrains Mono), mirrored as `--wv-*` CSS variables, plus the staggered HUD entrance (`hudEnter`, off under `prefers-reduced-motion`).
+- `components/TelemetryStatsBanner.tsx` shows the wordmark, a live tick (or a cross when disconnected) and the entity count.
+- `theme.ts` holds the design tokens (flat Michigan navy panels, maize as the only accent; Russo One / Archivo / JetBrains Mono), mirrored as `--wv-*` CSS variables, plus the staggered HUD entrance (`hudEnter`, off under `prefers-reduced-motion`).
 - `runtimeConfig.ts` reads `/config.json` once at startup (app name, Cesium ion token, default globe style).
 
 Adding a source never requires a frontend change: a new `layer.id` shows up in the legend and a new `display` is drawn automatically.

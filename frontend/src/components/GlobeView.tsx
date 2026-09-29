@@ -39,8 +39,9 @@ const NO_FADE = new Cesium.NearFarScalar(1.0, 1.0, 2.0, 1.0);
 // The selection ring is never faded, and shrinks less, so the selected target always stands out.
 const RING_SCALE_BY_DISTANCE = new Cesium.NearFarScalar(1.0e6, 1.0, 2.0e7, 0.7);
 
-// Initial framing: the whole disc centred in the viewport with a comfortable margin.
-const HOME_VIEW = { lon: 15, lat: 22, height: 1.75e7 };
+// Initial framing: the whole disc with clear space around it, facing the Americas (where the
+// shipped wildfire source has most of its events).
+const HOME_VIEW = { lon: -90, lat: 25, height: 2.6e7 };
 
 // ATC control zones are real ground geometry, not billboards: a 5–9 km circle has to grow and
 // shrink with the camera exactly like the terrain under it, which a screen-space billboard

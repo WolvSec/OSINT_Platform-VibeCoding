@@ -22,29 +22,25 @@ const renderWithProviders = (ui: ReactElement) =>
   );
 
 describe('Tactical HUD Components', () => {
-  it('TelemetryStatsBanner renders connection status and rates', () => {
-    renderWithProviders(
-      <TelemetryStatsBanner isConnected={true} isReconnecting={false} messageRate={42} />
-    );
-    expect(screen.getByRole('status', { name: /connection status: live/i })).toBeInTheDocument();
-    expect(screen.getByRole('group', { name: 'Message rate' })).toHaveTextContent('42msg/s');
+  it('TelemetryStatsBanner renders a live tick and the brand', () => {
+    renderWithProviders(<TelemetryStatsBanner isConnected={true} isReconnecting={false} />);
+    expect(screen.getByRole('status', { name: /connection status: live/i })).toHaveTextContent('✓');
+    expect(screen.queryByRole('group', { name: 'Message rate' })).not.toBeInTheDocument();
     // Brand block: WolvSec OSINT, not the old product name.
-    expect(screen.getByText('WS')).toBeInTheDocument();
+    expect(screen.getByText('WolvSec')).toBeInTheDocument();
     expect(screen.getByText('OSINT')).toBeInTheDocument();
     expect(screen.queryByText(/reconvillage/i)).not.toBeInTheDocument();
   });
 
   it('TelemetryStatsBanner shows Reconnecting and Offline states', () => {
     const { unmount } = renderWithProviders(
-      <TelemetryStatsBanner isConnected={false} isReconnecting={true} messageRate={0} />
+      <TelemetryStatsBanner isConnected={false} isReconnecting={true} />
     );
-    expect(screen.getByText('Reconnecting')).toBeInTheDocument();
+    expect(screen.getByRole('status', { name: /reconnecting/i })).toHaveTextContent('✗');
     unmount();
 
-    renderWithProviders(
-      <TelemetryStatsBanner isConnected={false} isReconnecting={false} messageRate={0} />
-    );
-    expect(screen.getByText('Offline')).toBeInTheDocument();
+    renderWithProviders(<TelemetryStatsBanner isConnected={false} isReconnecting={false} />);
+    expect(screen.getByRole('status', { name: /offline/i })).toHaveTextContent('✗');
   });
 
   it('LayerControlDrawer renders category filters and dispatches source toggles', async () => {

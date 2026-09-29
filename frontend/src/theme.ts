@@ -1,15 +1,12 @@
 import { createTheme, alpha } from '@mui/material/styles';
 
 /**
- * Design tokens — "maize & blue mission control" (University of Michigan / WolvSec).
+ * Design tokens: flat maize and blue (University of Michigan / WolvSec).
  *
- * Michigan navy (#00274C), deepened for a dark UI, is the base; maize (#FFCB05) is the one brand
- * accent (identity, selection, focus). Live/system state uses a cold signal cyan: the data on
- * the globe is warm (wildfire orange #ff6d00, and maize itself), so a hot red-orange "live" dot
- * would read as just another marker, while cyan is unambiguous against both. Red is reserved for
- * the offline/error state only.
+ * Panels are solid Michigan navy (#00274C); maize (#FFCB05) is the only accent (brand, selection,
+ * focus, live status). Red is kept for the offline state so it reads at a glance.
  *
- * Every text colour clears 4.5:1 on `bgPanel` (textMuted is the floor at ~4.7:1).
+ * Every text colour clears 4.5:1 on the panel colour.
  * These values are mirrored as CSS custom properties (`--wv-*`) by the theme's CssBaseline.
  */
 export const hud = {
@@ -19,14 +16,12 @@ export const hud = {
   accent: '#ffcb05', // maize
   accentSoft: 'rgba(255, 203, 5, 0.12)',
   onAccent: '#00274c',
-  signal: '#36d7ff', // live / system cyan
-  signalSoft: 'rgba(54, 215, 255, 0.12)',
   warning: '#ffcb05',
   danger: '#ff5a6e',
   textPrimary: '#eef3fa',
   textSecondary: '#a3b5cc',
   textMuted: '#7890ad',
-  surface: 'rgba(6, 17, 32, 0.84)',
+  surface: 'rgba(0, 39, 76, 0.94)', // Michigan navy, near-opaque
   surfaceSolid: '#0b1a2e',
   surfaceRaised: 'rgba(163, 181, 204, 0.05)',
   surfaceHover: 'rgba(163, 181, 204, 0.08)',
@@ -34,8 +29,7 @@ export const hud = {
   hairlineStrong: 'rgba(163, 181, 204, 0.22)',
   radius: 4,
   gutter: 16,
-  shadow: '0 18px 40px rgba(0, 6, 16, 0.55), 0 2px 6px rgba(0, 6, 16, 0.4)',
-  blur: 'blur(16px) saturate(130%)',
+  shadow: '0 4px 14px rgba(0, 6, 16, 0.45)',
   fontDisplay: '"Russo One", "Archivo", system-ui, sans-serif',
   fontSans: '"Archivo", system-ui, -apple-system, "Segoe UI", sans-serif',
   fontMono: '"JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace',
@@ -44,42 +38,14 @@ export const hud = {
   ease: 'cubic-bezier(0.16, 1, 0.3, 1)'
 } as const;
 
-/** Faint 24px blueprint grid + fractal-noise grain, layered under a panel's navy gradient. */
-const NOISE =
-  "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 160 160' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.07'/%3E%3C/svg%3E\")";
-export const panelTexture = [
-  NOISE,
-  'linear-gradient(rgba(163, 181, 204, 0.035) 1px, transparent 1px)',
-  'linear-gradient(90deg, rgba(163, 181, 204, 0.035) 1px, transparent 1px)',
-  'linear-gradient(180deg, rgba(0, 39, 76, 0.5) 0%, rgba(0, 39, 76, 0) 60%)'
-].join(', ');
-
-/** Shared `sx` for a floating glass panel: navy glass, blueprint grid, a maize corner tick. */
+/** Shared `sx` for a floating panel: flat Michigan navy, hairline border, no texture. */
 export const glassSurface = {
   position: 'relative',
   bgcolor: hud.surface,
-  backgroundImage: panelTexture,
-  backgroundSize: '160px 160px, 24px 24px, 24px 24px, 100% 100%',
-  backdropFilter: hud.blur,
-  WebkitBackdropFilter: hud.blur,
   border: `1px solid ${hud.hairline}`,
   borderRadius: `${hud.radius}px`,
   boxShadow: hud.shadow,
-  color: hud.textPrimary,
-  // Maize corner bracket: the one decorative flourish, marks every panel as part of one system.
-  '&::before': {
-    content: '""',
-    position: 'absolute',
-    top: -1,
-    left: -1,
-    width: 18,
-    height: 18,
-    borderTop: `2px solid ${hud.accent}`,
-    borderLeft: `2px solid ${hud.accent}`,
-    borderTopLeftRadius: `${hud.radius}px`,
-    pointerEvents: 'none',
-    zIndex: 1
-  }
+  color: hud.textPrimary
 } as const;
 
 /** Small uppercase eyebrow label (section headers, stat labels): heavy sans, wide tracking. */
@@ -133,7 +99,6 @@ const cssTokens = {
   '--wv-bg': hud.bgBase,
   '--wv-panel': hud.bgPanel,
   '--wv-maize': hud.accent,
-  '--wv-signal': hud.signal,
   '--wv-danger': hud.danger,
   '--wv-text': hud.textPrimary,
   '--wv-text-2': hud.textSecondary,
@@ -153,11 +118,11 @@ export const tacticalTheme = createTheme({
       paper: hud.surfaceSolid
     },
     primary: { main: hud.accent, contrastText: hud.onAccent },
-    secondary: { main: hud.signal },
+    secondary: { main: hud.accent },
     error: { main: hud.danger },
     warning: { main: hud.warning },
-    success: { main: hud.signal },
-    info: { main: hud.signal },
+    success: { main: hud.accent },
+    info: { main: hud.accent },
     divider: hud.hairline,
     text: {
       primary: hud.textPrimary,
@@ -242,7 +207,6 @@ export const tacticalTheme = createTheme({
       styleOverrides: {
         paper: {
           backgroundColor: 'rgba(11, 26, 46, 0.94)',
-          backdropFilter: hud.blur,
           backgroundImage: 'none',
           border: `1px solid ${hud.hairline}`,
           borderRadius: hud.radius,
