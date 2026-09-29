@@ -21,7 +21,7 @@ export const hud = {
   textPrimary: '#eef3fa',
   textSecondary: '#a3b5cc',
   textMuted: '#7890ad',
-  surface: 'rgba(0, 39, 76, 0.94)', // Michigan navy, near-opaque
+  surface: '#00274c', // Michigan navy, opaque so every panel is the same colour over any backdrop
   surfaceSolid: '#0b1a2e',
   surfaceRaised: 'rgba(163, 181, 204, 0.05)',
   surfaceHover: 'rgba(163, 181, 204, 0.08)',
